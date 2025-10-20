@@ -217,6 +217,12 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ message: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Appointment service listening on port ${PORT}`);
-});
+let server;
+
+if (process.env.NODE_ENV !== 'test') {
+  server = app.listen(PORT, () => {
+    console.log(`Appointment service listening on port ${PORT}`);
+  });
+}
+
+module.exports = { app, emitNotification, server };
