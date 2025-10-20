@@ -1,0 +1,47 @@
+flowchart LR
+  %% Users and load generators
+  subgraph U[Users]
+    C[Client / Postman / cURL]
+    K6[k6 Perf Tests]
+  end
+
+  %% Kubernetes cluster namespace
+  subgraph K[Minikube Kubernetes (namespace: careconnect)]
+    direction LR
+
+    subgraph A[Appointment Service]
+      ADEP[Deployment: appointment-service]
+      ASVC[Service: appointment-service]
+      AHPA[HPA: CPU 70% (min 1, max 5)]
+      ADB[(JSON Store: appointments.json)]
+    end
+
+    subgraph N[Notification Service]
+      NDEP[Deployment: notification-service]
+      NSVC[Service: notification-service]
+      NHPA[HPA: CPU 70% (min 1, max 5)]
+      NDB[(JSON Store: notifications.json)]
+    end
+
+    MS[(metrics-server)]
+  end
+
+  %% Traffic and interactions
+  C -->|HTTP| ASVC
+  K6 -->|Load| ASVC
+  ASVC --> ADEP
+  NSVC --> NDEP
+
+  ADEP -- "POST /notifications" --> NSVC
+  ADEP --> ADB
+  NDEP --> NDB
+
+  AHPA -. scales .-> ADEP
+  NHPA -. scales .-> NDEP
+  MS -. CPU metrics .-> AHPA
+  MS -. CPU metrics .-> NHPA
+
+  %% Notes
+  note right of NDEP: Dispatch simulated via logs
+  note left of ADEP: Emits notifications on create / status update
+

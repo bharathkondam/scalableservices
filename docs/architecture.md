@@ -90,3 +90,49 @@ Event-driven examples: `AppointmentConfirmed`, `AppointmentCancelled`, `InvoiceP
 - **Notification Service** – REST API + async worker that consumes appointment events (HTTP simulation for prototype), records notification history.
 
 The implementation delivers a lightweight slice of the architecture with deployable containers and Kubernetes manifests while documenting how to extend toward the full target state.
+
+## 9. High‑Level Diagram
+
+```mermaid
+flowchart LR
+  subgraph U[Users]
+    C[Client / Postman / cURL]
+    K6[k6 Perf Tests]
+  end
+
+  subgraph K[Minikube Kubernetes (namespace: careconnect)]
+    direction LR
+
+    subgraph A[Appointment Service]
+      ADEP[Deployment: appointment-service]
+      ASVC[Service: appointment-service]
+      AHPA[HPA: CPU 70% (min 1, max 5)]
+      ADB[(JSON Store: appointments.json)]
+    end
+
+    subgraph N[Notification Service]
+      NDEP[Deployment: notification-service]
+      NSVC[Service: notification-service]
+      NHPA[HPA: CPU 70% (min 1, max 5)]
+      NDB[(JSON Store: notifications.json)]
+    end
+
+    MS[(metrics-server)]
+  end
+
+  C -->|HTTP| ASVC
+  K6 -->|Load| ASVC
+  ASVC --> ADEP
+  NSVC --> NDEP
+  ADEP -- "POST /notifications" --> NSVC
+  ADEP --> ADB
+  NDEP --> NDB
+  AHPA -. scales .-> ADEP
+  NHPA -. scales .-> NDEP
+  MS -. CPU metrics .-> AHPA
+  MS -. CPU metrics .-> NHPA
+```
+
+Notes:
+- Local prototype uses direct HTTP between Appointment and Notification services; event broker can be introduced later.
+- HPAs rely on Metrics Server; enable via `minikube addons enable metrics-server`.
