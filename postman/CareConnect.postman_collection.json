@@ -1,0 +1,152 @@
+{
+  "info": {
+    "name": "CareConnect – Appointment & Notification",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Sample requests for Appointment and Notification services."
+  },
+  "item": [
+    {
+      "name": "Appointment Service",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{appointment_base_url}}/health", "host": ["{{appointment_base_url}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Create Appointment",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isoIn10m = new Date(Date.now() + 10*60*1000).toISOString();",
+                  "pm.variables.set('iso_in_10m', isoIn10m);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "try { const id = pm.response.json().id; if (id) { pm.collectionVariables.set('appointment_id', id); } } catch (e) {}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"patient-123\",\n  \"providerId\": \"provider-456\",\n  \"scheduledFor\": \"{{iso_in_10m}}\",\n  \"reason\": \"postman test\"\n}"
+            },
+            "url": { "raw": "{{appointment_base_url}}/appointments", "host": ["{{appointment_base_url}}"], "path": ["appointments"] }
+          }
+        },
+        {
+          "name": "Get Appointment by ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{appointment_base_url}}/appointments/{{appointment_id}}", "host": ["{{appointment_base_url}}"], "path": ["appointments", "{{appointment_id}}"] }
+          }
+        },
+        {
+          "name": "Update Appointment Status",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CANCELLED\",\n  \"reason\": \"change of plans\"\n}"
+            },
+            "url": { "raw": "{{appointment_base_url}}/appointments/{{appointment_id}}/status", "host": ["{{appointment_base_url}}"], "path": ["appointments", "{{appointment_id}}", "status"] }
+          }
+        },
+        {
+          "name": "List Appointments (by status)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{appointment_base_url}}/appointments?status=CANCELLED",
+              "host": ["{{appointment_base_url}}"],
+              "path": ["appointments"],
+              "query": [ { "key": "status", "value": "CANCELLED" } ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notification Service",
+      "item": [
+        {
+          "name": "Health",
+          "request": { "method": "GET", "url": { "raw": "{{notification_base_url}}/health", "host": ["{{notification_base_url}}"], "path": ["health"] } }
+        },
+        {
+          "name": "Create Notification",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const isoIn10m = new Date(Date.now() + 10*60*1000).toISOString();",
+                  "pm.variables.set('iso_in_10m', isoIn10m);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', function () { pm.response.to.have.status(202); });",
+                  "try { const id = pm.response.json().id; if (id) { pm.collectionVariables.set('notification_id', id); } } catch (e) {}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"appointment.reminder\",\n  \"channel\": \"EMAIL\",\n  \"recipient\": \"user@example.com\",\n  \"payload\": {\n    \"patientId\": \"patient-123\",\n    \"providerId\": \"provider-456\",\n    \"scheduledFor\": \"{{iso_in_10m}}\"\n  },\n  \"source\": \"postman\"\n}"
+            },
+            "url": { "raw": "{{notification_base_url}}/notifications", "host": ["{{notification_base_url}}"], "path": ["notifications"] }
+          }
+        },
+        {
+          "name": "Get Notification by ID",
+          "request": { "method": "GET", "url": { "raw": "{{notification_base_url}}/notifications/{{notification_id}}", "host": ["{{notification_base_url}}"], "path": ["notifications", "{{notification_id}}"] } }
+        },
+        {
+          "name": "List Notifications (SENT)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{notification_base_url}}/notifications?status=SENT",
+              "host": ["{{notification_base_url}}"],
+              "path": ["notifications"],
+              "query": [ { "key": "status", "value": "SENT" } ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "appointment_base_url", "value": "http://localhost:3100", "type": "string" },
+    { "key": "notification_base_url", "value": "http://localhost:3000", "type": "string" },
+    { "key": "appointment_id", "value": "", "type": "string" },
+    { "key": "notification_id", "value": "", "type": "string" }
+  ]
+}
+
