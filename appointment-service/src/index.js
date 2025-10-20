@@ -5,6 +5,7 @@ const Joi = require('joi');
 const axios = require('axios').default;
 const { randomUUID } = require('crypto');
 const db = require('./db');
+const swaggerUi = require('swagger-ui-express');
 
 const app = express();
 
@@ -19,6 +20,146 @@ app.use(
 const PORT = process.env.PORT || 3100;
 const NOTIFICATION_SERVICE_URL =
   process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3000';
+
+// OpenAPI (Swagger) setup
+const openApiSpec = {
+  openapi: '3.0.0',
+  info: {
+    title: 'CareConnect Appointment Service',
+    version: '1.0.0',
+    description: 'API for managing appointments.'
+  },
+  servers: [
+    { url: process.env.SWAGGER_SERVER_URL || `http://localhost:${PORT}` }
+  ],
+  components: {
+    schemas: {
+      Appointment: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          patientId: { type: 'string' },
+          providerId: { type: 'string' },
+          scheduledFor: { type: 'string', format: 'date-time' },
+          status: {
+            type: 'string',
+            enum: ['CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW']
+          },
+          reason: { type: 'string', nullable: true },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' }
+        }
+      },
+      AppointmentCreateRequest: {
+        type: 'object',
+        required: ['patientId', 'providerId', 'scheduledFor'],
+        properties: {
+          patientId: { type: 'string' },
+          providerId: { type: 'string' },
+          scheduledFor: { type: 'string', format: 'date-time' },
+          reason: { type: 'string' }
+        }
+      },
+      AppointmentStatusUpdateRequest: {
+        type: 'object',
+        required: ['status'],
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW']
+          },
+          reason: { type: 'string' }
+        }
+      }
+    }
+  },
+  paths: {
+    '/health': {
+      get: {
+        summary: 'Health check',
+        responses: {
+          200: { description: 'OK' }
+        }
+      }
+    },
+    '/appointments': {
+      post: {
+        summary: 'Create an appointment',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/AppointmentCreateRequest' }
+            }
+          }
+        },
+        responses: {
+          201: { description: 'Created' },
+          400: { description: 'Validation error' }
+        }
+      },
+      get: {
+        summary: 'List appointments',
+        parameters: [
+          { name: 'patientId', in: 'query', schema: { type: 'string' } },
+          { name: 'providerId', in: 'query', schema: { type: 'string' } },
+          {
+            name: 'status',
+            in: 'query',
+            schema: {
+              type: 'string',
+              enum: ['CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW']
+            }
+          }
+        ],
+        responses: {
+          200: {
+            description: 'List of appointments',
+            content: {
+              'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/Appointment' } } }
+            }
+          }
+        }
+      }
+    },
+    '/appointments/{id}': {
+      get: {
+        summary: 'Get appointment by id',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } }
+        ],
+        responses: {
+          200: { description: 'Appointment', content: { 'application/json': { schema: { $ref: '#/components/schemas/Appointment' } } } },
+          404: { description: 'Not found' }
+        }
+      }
+    },
+    '/appointments/{id}/status': {
+      patch: {
+        summary: 'Update appointment status',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/AppointmentStatusUpdateRequest' }
+            }
+          }
+        },
+        responses: {
+          200: { description: 'Updated', content: { 'application/json': { schema: { $ref: '#/components/schemas/Appointment' } } } },
+          400: { description: 'Validation error' },
+          404: { description: 'Not found' }
+        }
+      }
+    }
+  }
+};
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, { explorer: true }));
+app.get('/openapi.json', (_req, res) => res.json(openApiSpec));
 
 const createSchema = Joi.object({
   patientId: Joi.string().trim().required(),

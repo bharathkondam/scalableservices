@@ -4,6 +4,7 @@ const morgan = require('morgan');
 const Joi = require('joi');
 const { randomUUID } = require('crypto');
 const db = require('./db');
+const swaggerUi = require('swagger-ui-express');
 
 const app = express();
 
@@ -16,6 +17,89 @@ app.use(
 );
 
 const PORT = process.env.PORT || 3000;
+
+// OpenAPI (Swagger) setup
+const openApiSpec = {
+  openapi: '3.0.0',
+  info: {
+    title: 'CareConnect Notification Service',
+    version: '1.0.0',
+    description: 'API for recording and simulating notifications.'
+  },
+  servers: [
+    { url: process.env.SWAGGER_SERVER_URL || `http://localhost:${PORT}` }
+  ],
+  components: {
+    schemas: {
+      Notification: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          type: { type: 'string' },
+          channel: { type: 'string', enum: ['EMAIL', 'SMS', 'PUSH'] },
+          recipient: { type: 'string' },
+          payload: { type: 'object' },
+          source: { type: 'string' },
+          status: { type: 'string', enum: ['QUEUED', 'SENT', 'FAILED'] },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+          lastError: { type: 'string', nullable: true }
+        }
+      },
+      NotificationCreateRequest: {
+        type: 'object',
+        required: ['type', 'payload', 'source'],
+        properties: {
+          type: { type: 'string' },
+          channel: { type: 'string', enum: ['EMAIL', 'SMS', 'PUSH'], default: 'EMAIL' },
+          recipient: { type: 'string' },
+          payload: { type: 'object' },
+          source: { type: 'string' },
+          overwriteStatus: { type: 'string', enum: ['QUEUED', 'SENT', 'FAILED'] }
+        }
+      }
+    }
+  },
+  paths: {
+    '/health': {
+      get: { summary: 'Health check', responses: { 200: { description: 'OK' } } }
+    },
+    '/notifications': {
+      post: {
+        summary: 'Create/record a notification',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/NotificationCreateRequest' } } }
+        },
+        responses: { 202: { description: 'Accepted' }, 400: { description: 'Validation error' } }
+      },
+      get: {
+        summary: 'List notifications',
+        parameters: [
+          { name: 'type', in: 'query', schema: { type: 'string' } },
+          { name: 'recipient', in: 'query', schema: { type: 'string' } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['QUEUED', 'SENT', 'FAILED'] } }
+        ],
+        responses: {
+          200: { description: 'List of notifications', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/Notification' } } } } }
+        }
+      }
+    },
+    '/notifications/{id}': {
+      get: {
+        summary: 'Get notification by id',
+        parameters: [ { name: 'id', in: 'path', required: true, schema: { type: 'string' } } ],
+        responses: {
+          200: { description: 'Notification', content: { 'application/json': { schema: { $ref: '#/components/schemas/Notification' } } } },
+          404: { description: 'Not found' }
+        }
+      }
+    }
+  }
+};
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, { explorer: true }));
+app.get('/openapi.json', (_req, res) => res.json(openApiSpec));
 
 const createSchema = Joi.object({
   type: Joi.string().trim().max(64).required(),
