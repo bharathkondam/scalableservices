@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appointment-service
+  namespace: careconnect
+  labels:
+    app: appointment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: appointment-service
+  template:
+    metadata:
+      labels:
+        app: appointment-service
+    spec:
+      containers:
+        - name: appointment-service
+          image: careconnect/appointment-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3100
+          env:
+            - name: PORT
+              value: '3100'
+            - name: NOTIFICATION_SERVICE_URL
+              value: http://notification-service.careconnect.svc.cluster.local:3000
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3100
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3100
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 150m
+              memory: 192Mi
+            limits:
+              cpu: 300m
+              memory: 384Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: appointment-service
+  namespace: careconnect
+spec:
+  selector:
+    app: appointment-service
+  ports:
+    - protocol: TCP
+      port: 3100
+      targetPort: 3100
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: appointment-service
+  namespace: careconnect
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: appointment-service
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

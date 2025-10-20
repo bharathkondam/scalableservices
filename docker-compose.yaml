@@ -1,0 +1,23 @@
+services:
+  notification-service:
+    build:
+      context: ./notification-service
+    image: careconnect-notification-service:latest
+    ports:
+      - '3000:3000'
+    environment:
+      - PORT=3000
+    restart: unless-stopped
+
+  appointment-service:
+    build:
+      context: ./appointment-service
+    image: careconnect-appointment-service:latest
+    ports:
+      - '3100:3100'
+    environment:
+      - PORT=3100
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3000
+    depends_on:
+      - notification-service
+    restart: unless-stopped
